@@ -56,9 +56,6 @@ const ErrorCode = enum(u8) {
     MissingFunction,
     MetaDataHasIncorrectType,
 };
-fn errorCodeExplanations() std.builtin.SourceLocation {
-    return @src();
-}
 
 const Writer = blk: {
     var error_message_buffer = std.io.bufferedWriter(std.io.null_writer);
@@ -67,8 +64,7 @@ const Writer = blk: {
     break :blk @TypeOf(error_writer);
 };
 
-pub fn checkTrait(comptime location: std.builtin.SourceLocation, comptime Trait: type, comptime T: type) void {
-    _ = location;
+pub fn checkTrait(comptime Trait: type, comptime T: type) void {
 
     //--------------------------------------------------
     // Error Messaging Setup
@@ -86,11 +82,10 @@ pub fn checkTrait(comptime location: std.builtin.SourceLocation, comptime Trait:
         \\
     ;
 
-    // const error_code_explanations_location = comptime errorCodeExplanations();
     error_writer.print(error_message_header, .{
         major_version,
         minor_version,
-        comptime errorCodeExplanations().file,
+        @src().file,
     }) catch unreachable;
 
     defer {

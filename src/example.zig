@@ -25,7 +25,7 @@ const GraphTrait = struct {
 pub fn aStar(graph: anytype, start: usize, end: usize) !void {
     _ = end;
     _ = start;
-    comptime traitor.checkTrait(@src(), GraphTrait, @TypeOf(graph));
+    comptime traitor.checkTrait(GraphTrait, @TypeOf(graph));
 
     std.debug.print("Is graph directed? {s}\n", .{if (@TypeOf(graph).Directed) "yes" else "no"});
 }
