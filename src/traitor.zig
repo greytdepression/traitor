@@ -35,8 +35,10 @@ const ErrorCode = enum(u8) {
     TypeNotAStruct,
     DeclarationIncompatibleType,
     FunctionIncompatibleSignature,
+    FieldIncompatibleType,
     MissingDeclaration,
     MissingFunction,
+    MissingField,
     MetaDataHasIncorrectType,
 };
 
@@ -192,11 +194,20 @@ pub fn checkTrait(comptime Trait: type, comptime T: type) void {
 
             if (t_field_type != trait_field_type) {
                 success = false;
-                @compileError("Field '" ++ trait_field_name ++ "' has the wrong type. Expected '" ++ @typeName(trait_field_type) ++ "', found '" ++ @typeName(t_field_type) ++ "'.");
+
+                printError("Field '{s}' has the wrong type. Expected '{s}', found '{s}'.", &error_writer, .FieldIncompatibleType, .{
+                    trait_field_name,
+                    @typeName(trait_field_type),
+                    @typeName(t_field_type),
+                });
             }
         } else {
             success = false;
-            @compileError("Missing field '" ++ trait_field_name ++ "'.");
+
+            printError("Missing field '{s}: {s}'.", &error_writer, .MissingField, .{
+                trait_field_name,
+                @typeName(trait_field_type),
+            });
         }
     }
 }
