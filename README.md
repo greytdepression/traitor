@@ -51,18 +51,8 @@ const GraphTrait2 = struct {
     // ...
 };
 ```
-const ErrorCode = enum(u8) {
-    Unknown = 0,
-    TraitNotAStruct = 1,
-    TypeNotAStruct = 2,
-    DeclarationIncompatibleType = 3,
-    FunctionIncompatibleSignature = 4,
-    FieldIncompatibleType = 5,
-    MissingDeclaration = 6,
-    MissingFunction = 7,
-    MissingField = 8,
-    MetaDataHasIncorrectType = 9,
-};
+**Warning: the prefix `__traitor_internal` is reserved for internal meta data. Using it yourself may
+result unforseen errors.**
 
 ## Error Codes
 Traitor prints a two digit error code (e.g. `[E01]`) at the start of each error message. These can be
@@ -144,7 +134,7 @@ With the graph example above, the following implementation would cause this erro
 const MyGraph = struct {};
 ```
 
-### `[E09] MetaDataHasIncorrectType`
+### `[E09] TraitMetaDataHasIncorrectType`
 This is an error with the trait you supplied, not the type that is supposed to be checked. One of the
 meta data declarations of the trait has the wrong type. You or the library that you are using supplied
 added incompatible meta data.

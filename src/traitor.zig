@@ -73,6 +73,8 @@
 //     // ...
 // };
 // ```
+// **Warning: the prefix `__traitor_internal` is reserved for internal meta data. Using it yourself may
+// result unforseen errors.**
 //
 // For an explanation of error codes, see below.
 
@@ -164,7 +166,7 @@ const meta_trait_name = meta_declaration_modifier ++ "_trait_name";
 /// const MyGraph = struct {};
 /// ```
 ///
-/// ### `[E09] MetaDataHasIncorrectType`
+/// ### `[E09] TraitMetaDataHasIncorrectType`
 /// This is an error with the trait you supplied, not the type that is supposed to be checked. One of the
 /// meta data declarations of the trait has the wrong type. You or the library that you are using supplied
 /// added incompatible meta data.
