@@ -22,11 +22,6 @@
 //! NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
 //! WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-const std = @import("std");
-const trait = std.meta.trait;
-
-const Type = std.builtin.Type;
-
 const major_version = 0;
 const minor_version = 1;
 
@@ -44,13 +39,6 @@ const ErrorCode = enum(u8) {
     MissingFunction,
     MissingField,
     MetaDataHasIncorrectType,
-};
-
-const Writer = blk: {
-    var error_message_buffer = std.io.bufferedWriter(std.io.null_writer);
-    var error_writer = error_message_buffer.writer();
-
-    break :blk @TypeOf(error_writer);
 };
 
 pub fn checkTrait(comptime Trait: type, comptime T: type) void {
@@ -113,13 +101,16 @@ pub fn checkTrait(comptime Trait: type, comptime T: type) void {
     // Trait Meta Data Validation
     //--------------------------------------------------
 
-    // In case there are no errors with the trait itself, reset `error_message_buffer.end` to `backup_point`
-    // to erase those messages.
-    const backup_point = error_message_buffer.end;
-    error_writer.print("The trait '{s}' is not well-formed. Encountered the following error(s):\n", .{@typeName(Trait)}) catch unreachable;
-
-    // Check for trait metadata
-    const trait_name = comptime blk: {
+    var trait_name: []const u8 = @typeName(Trait);
+    const type_name = @typeName(T);
+    {
+        // In case there are no errors with the trait itself, reset `error_message_buffer.end` to `backup_point`
+        // to erase those messages.
+        const backup_point = error_message_buffer.end;
+        error_writer.print("The trait '{s}' is not well-formed. Encountered the following error(s):\n", .{@typeName(Trait)}) catch unreachable;
+        defer if (success) {
+            error_message_buffer.end = backup_point;
+        };
 
         // Check if the trait contains a `__traitor_trait_name` declaration
         if (@hasDecl(Trait, meta_trait_name)) {
@@ -127,38 +118,28 @@ pub fn checkTrait(comptime Trait: type, comptime T: type) void {
 
             // Check if the declaration is compatible with `[]const u8`
             if (isCoercibleToString(@TypeOf(value))) {
-                break :blk @as([]const u8, value);
+                trait_name = value;
             } else {
                 printError("The type of the trait's '{s}' declaration must be compatible with '[]const u8', found '{s}' instead.", &error_writer, .MetaDataHasIncorrectType, .{
                     meta_trait_name,
                     @typeName(@TypeOf(value)),
                 });
                 success = false;
+
+                // We encountered errors with the trait itself. Do not check T.
+                return;
             }
         }
-
-        break :blk @as([]const u8, @typeName(Trait));
-    };
-
-    const type_name = @typeName(T);
-
-    if (success) {
-        // There were no errors with the trait itself. Reset the message about the trait being not well-formed.
-        error_message_buffer.end = backup_point;
-    } else {
-        // We encountered errors with the trait itself. Do not check T.
-        return;
     }
-
-    // Knowing the trait's name, we can now give some additional info in the print out.
-    error_writer.print(
-        \\The type '{s}' does not satisfy the trait bounds of trait '{s}' due to the following errors:
-        \\
-    , .{ type_name, trait_name }) catch unreachable;
 
     //--------------------------------------------------
     // Check if T satisfies the trait boundary
     //--------------------------------------------------
+
+    error_writer.print(
+        \\The type '{s}' does not satisfy the trait bounds of trait '{s}' due to the following errors:
+        \\
+    , .{ type_name, trait_name }) catch unreachable;
 
     // Declarations
     inline for (trait_struct_info.decls) |trait_decl| {
@@ -215,6 +196,14 @@ pub fn checkTrait(comptime Trait: type, comptime T: type) void {
         }
     }
 }
+
+const std = @import("std");
+const Type = std.builtin.Type;
+
+const Writer = blk: {
+    var error_message_buffer = std.io.bufferedWriter(std.io.null_writer);
+    break :blk @TypeOf(error_message_buffer.writer());
+};
 
 fn declTypeErrorMessage(writer: *Writer, name: []const u8, comptime expected_type: type, comptime actual_type: type) void {
     const expected_type_info = @typeInfo(expected_type);
