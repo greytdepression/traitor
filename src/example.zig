@@ -4,7 +4,6 @@ const traitor = @import("traitor.zig");
 const GraphTrait = struct {
     pub const __traitor_trait_name = 0;
 
-    pub const Payload = void;
     pub const Directed = false;
 
     n: usize,
@@ -31,7 +30,6 @@ pub fn aStar(graph: anytype, start: usize, end: usize) !void {
 }
 
 const MyGraph = struct {
-    pub const Payload = void;
     pub const Directed = 5;
 
     n: usize = 0,
