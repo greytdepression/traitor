@@ -52,7 +52,103 @@ const GraphTrait2 = struct {
 };
 ```
 **Warning: the prefix `__traitor_internal` is reserved for internal meta data. Using it yourself may
-result unforseen errors.**
+result in unforseen errors.**
+
+## Associated Types
+One limitation that might become obvious pretty quickly is that defining methods is not possible
+with the tools laid out above. Specifically, if we had a trait
+```zig
+const GraphTrait = struct {
+    pub fn numEdges(self: GraphTrait) usize {
+        // code
+    }
+};
+```
+then any type implementing `GraphTrait` would have to add a function `numEdges` that takes as input
+parameter an instance of `GraphTrait` -- not of the type that implements it.
+```zig
+const MyGraph = struct {
+    num_edges: usize,
+
+    pub fn numEdges(self: GraphTrait) usize {
+        // no access to the field `num_edges` :(
+    }
+};
+```
+To allow for this, traitor can handle 'associated types' that get substituted at comptime to the
+relevant actual types.
+
+### `GenericSelf`
+The type `traitor.GenericSelf` will be substituted to whatever type that is being checked against trait
+bounds. So in the above example, we could actually implement methods using `traitor.GenericSelf`:
+```zig
+const GraphTrait = struct {
+    pub fn numEdges(self: traitor.GenericSelf) usize {
+        return 0;
+    }
+};
+
+const MyGraph = struct {
+    num_edges: usize,
+
+    pub fn numEdges(self: MyGraph) usize {
+        return self.num_edges; // :)
+    }
+};
+```
+Since type substitution works recursively, this also works with compound types and we can thus even take pointers
+to `self` and modify the struct.
+```zig
+const GraphTrait = struct {
+    pub fn addEdge(self: *traitor.GenericSelf, i: usize, j: usize) void {
+        // ...
+    }
+};
+
+const MyGraph = struct {
+    pub fn addEdge(self: *MyGraph, i: usize, j: usize) void {
+        // code
+    }
+};
+```
+
+### `AssociatedType("AssociatedTypeName")`
+We can use the same type substitution as in `traitor.GenericSelf` with arbitrary other associated types.
+To add an associated type, first the trait needs to have a declaration of type `type` and whose name is
+the name of the associated type.
+```zig
+const GraphTrait = struct {
+    pub const Payload = usize;
+};
+```
+Note that the types implementing your trait will be able to override the value
+of the declaration (i.e. what type the payload will be in this example), but they will still need to supply
+a `type` (e.g. they might use `Payload = []const u8` to store strings instead of integers).
+After that, you can reference this associated type throughout your trait using `traitor.AssociatedType("<name of AT>")`.
+```zig
+const GraphTrait = struct {
+    pub const Payload = usize;
+    pub const DefaultPayload: traitor.AssociatedType("Payload") = undefined;
+
+    some_node_payload: traitor.AssociatedType("Payload"),
+
+    pub fn getPayload(self: traitor.GenericSelf, i: usize) traitor.AssociatedType("Payload") {
+        // ...
+    }
+};
+
+const MyGraph = struct {
+    pub const Payload = []const u8;
+    pub const DefaultPayload: []const u8 = "foobar";
+
+    some_node_payload: []const u8,
+
+    pub fn getPayload(self: MyGraph, i: usize) []const u8 {
+        return self.some_node_payload;
+    }
+};
+```
+
 
 ## Error Codes
 Traitor prints a two digit error code (e.g. `[E01]`) at the start of each error message. These can be
@@ -144,5 +240,91 @@ const GraphTrait = struct {
     // [E09] The type of the trait's '__traitor_trait_name' declaration must be compatible with
     // '[]const u8', found 'bool' instead.
     pub const __traitor_trait_name = false;
+};
+```
+
+### `[E10] TraitIllegalUseOfTraitorInternalDecl`
+This is an error with the trait you supplied, not the type that is supposed to be checked. The trait has
+a declaration whose name starts with `__traitor_internal`. This prefix is reserved for internal mechanisms
+and thus this declaration caused an error in the internal logic.
+As an example, the following code will produce this error as `__traitor_internal_associated_type_decl_name`
+is used internally.
+```zig
+const GraphTrait = struct {
+    // [E10] Illegal use of `__traitor_internal_associated_type_decl_name` declaration in trait.
+    pub const Foobar: struct {
+        pub const __traitor_internal_associated_type_decl_name = 9;
+    } = .{};
+};
+```
+
+### `[E11] TraitMissingAssociatedTypeDeclaration`
+This is an error with the trait you supplied, not the type that is supposed to be checked. The trait references
+an associated type, but never declares it.
+As an example, the following code will produce this error as `Payload` is never declared.
+```zig
+const GraphTrait = struct {
+    // [E11] Expected declaration of associated type 'Payload' in trait.
+    pub fn defaultPayload() traitor.AssociatedType("Payload") {
+        // code
+    }
+
+    // To fix this, uncomment type following line and add a type
+    // pub const Payload: type = ...;
+};
+```
+
+### `[E12] TraitAssociatedTypeNotAType`
+This is an error with the trait you supplied, not the type that is supposed to be checked. The trait references
+an associated type, but the declaration is not of type `type`.
+As an example, the following code will produce this error as `Payload` is an `i32` and not a `type`. It would
+be correct to define `Payload = i32`.
+```zig
+const GraphTrait = struct {
+    // [E12] Expected declaration of associated type 'Payload' to be of type 'type', got 'i32' instead.
+    pub fn defaultPayload() traitor.AssociatedType("Payload") {
+        // code
+    }
+
+    pub const Payload: i32 = 0;
+};
+```
+
+### `[E13] TraitGenericTypeLayoutNotAuto`
+This is an error with the trait you supplied, not the type that is supposed to be checked. The trait has a field
+or declaration that has a type that makes use of an associated type internally while also having non-auto layout.
+As an example, the following code will produce this error as `GenericAssociatedFoo` has type that is an
+`extern struct` (thus layout `extern` and not `auto`) but also contains a field whose type is defined by the
+associated type `Payload`. If you remove `extern`, the below code would compile.
+```zig
+const GraphTrait = struct {
+    // [E13] Structs making use of associated types must have automatic layout. Found issue in
+    // 'example.GraphTrait.GenericAssociatedFoo'.
+    pub const GenericAssociatedFoo: extern struct {
+        bar: traitor.AssociatedType("Payload"),
+    } = undefined;
+
+    pub const Payload = void;
+};
+```
+
+### `[E14] TraitGenericTypeHasDecls`
+This is an error with the trait you supplied, not the type that is supposed to be checked. The trait has a field
+or declaration that has a type that makes use of an associated type internally while also having a declaration.
+This is currently not possible due to a limitation of how `@Type` works in zig
+(https://github.com/ziglang/zig/issues/6709).
+As an example, the following code will produce this error as `GenericAssociatedFoo` has type that contains a field
+whose type is defined by the associated type `Payload` while also containing a declaration `SomeDeclaration`.
+```zig
+const GraphTrait = struct {
+    // [E14] Structs making use of associated types must not have declarations.
+    // Found issue in 'example.GraphTrait.GenericAssociatedFoo'.
+    pub const GenericAssociatedFoo: struct {
+        const SomeDeclaration: i32 = 5;
+
+        bar: traitor.AssociatedType("Payload"),
+    } = undefined;
+
+    pub const Payload = void;
 };
 ```
