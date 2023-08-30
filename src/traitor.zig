@@ -189,7 +189,7 @@ const ErrorCode = enum(u8) {
     MissingFunction = 7,
     MissingField = 8,
     TraitMetaDataHasIncorrectType = 9,
-    IllegalUseOfTraitorInternalDecl = 10,
+    TraitIllegalUseOfTraitorInternalDecl = 10,
     TraitMissingGenericTypeDeclaration = 11,
     TraitGenericTypeNotAType = 12,
     TraitGenericTypeLayoutNotAuto = 13,
@@ -532,7 +532,7 @@ fn SubstitutedType(comptime ctx: Context, comptime pattern: type, comptime Trait
 
                 // Check that associated_type_decl_name is in fact a string
                 if (@TypeOf(associated_type_decl_name) != []const u8) {
-                    printError("Illegal use of `{s}` declaration in trait.", ctx.writer, .IllegalUseOfTraitorInternalDecl, .{associated_type_decl_identifier});
+                    printError("Illegal use of `{s}` declaration in trait.", ctx.writer, .TraitIllegalUseOfTraitorInternalDecl, .{associated_type_decl_identifier});
 
                     return pattern;
                 }
