@@ -192,10 +192,10 @@ const ErrorCode = enum(u8) {
     IllegalUseOfTraitorInternalDecl = 10,
     TraitMissingGenericTypeDeclaration = 11,
     TraitGenericTypeNotAType = 12,
-    TraitGenericTypeStructNotAuto = 13,
+    TraitGenericTypeLayoutNotAuto = 13,
 
     // https://github.com/ziglang/zig/issues/6709
-    TraitGenericTypeStructHasDecls = 14,
+    TraitGenericTypeHasDecls = 14,
 };
 
 // Constants
@@ -599,7 +599,7 @@ fn SubstitutedType(comptime ctx: Context, comptime pattern: type, comptime Trait
             modified_info.fields = &field_buffer;
 
             if (!may_be_generic and is_generic) {
-                printError("Structs making use of GATs must have automatic layout. Found issue in '{s}'.", ctx.writer, .TraitGenericTypeStructNotAuto, .{
+                printError("Structs making use of associated types must have automatic layout. Found issue in '{s}'.", ctx.writer, .TraitGenericTypeLayoutNotAuto, .{
                     @typeName(original_pattern),
                 });
 
@@ -608,7 +608,7 @@ fn SubstitutedType(comptime ctx: Context, comptime pattern: type, comptime Trait
 
             // https://github.com/ziglang/zig/issues/6709
             if (is_generic and strct.decls.len != 0) {
-                printError("Structs making use of GATs must not have declarations. Found issue in '{s}'.", ctx.writer, .TraitGenericTypeStructHasDecls, .{
+                printError("Structs making use of GATs must not have declarations. Found issue in '{s}'.", ctx.writer, .TraitGenericTypeHasDecls, .{
                     @typeName(original_pattern),
                 });
 
@@ -668,7 +668,57 @@ fn SubstitutedType(comptime ctx: Context, comptime pattern: type, comptime Trait
 
             return @Type(.{ .Vector = modified_info });
         },
-        .Enum, .Union => {}, // TODO: we first need caching
+        // Enum's would need GAT declarations, but these don't work at the moment.
+        // https://github.com/ziglang/zig/issues/6709
+        .Enum => {},
+        .Union => |uni| {
+            // Check that we don't do weird stuff. If the layout is not Auto,
+            // we don't allow generic shenanigans.
+            const may_be_generic = uni.layout == .Auto;
+
+            var is_generic = false;
+
+            var modified_info = uni;
+
+            var field_buffer: [uni.fields.len]Type.UnionField = undefined;
+
+            for (uni.fields, 0..) |field, i| {
+                const subst_type = SubstitutedType(ctx, field.type, Trait, T, original_pattern);
+
+                if (field.type != subst_type) {
+                    is_generic = true;
+                }
+
+                field_buffer[i] = .{
+                    .name = field.name,
+                    .type = subst_type,
+                    .alignment = @alignOf(subst_type),
+                };
+            }
+
+            modified_info.fields = &field_buffer;
+
+            if (!may_be_generic and is_generic) {
+                printError("Unions making use of associated types must have automatic layout. Found issue in '{s}'.", ctx.writer, .TraitGenericTypeLayoutNotAuto, .{
+                    @typeName(original_pattern),
+                });
+
+                return pattern;
+            }
+
+            // https://github.com/ziglang/zig/issues/6709
+            if (is_generic and uni.decls.len != 0) {
+                printError("Unions making use of associated types must not have declarations. Found issue in '{s}'.", ctx.writer, .TraitGenericTypeHasDecls, .{
+                    @typeName(original_pattern),
+                });
+
+                return pattern;
+            }
+
+            const out_type = @Type(.{ .Union = modified_info });
+            ctx.cache.setKV(pattern, out_type);
+            return out_type;
+        },
         else => unreachable,
     }
 
