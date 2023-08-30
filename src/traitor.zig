@@ -518,7 +518,6 @@ fn SubstitutedType(comptime ctx: Context, comptime pattern: type, comptime Trait
     const cached_type = ctx.cache.getValue(pattern);
 
     if (cached_type) |ctype| {
-        @compileLog("we had", pattern, "cached! it's", ctype);
         return ctype;
     }
 
