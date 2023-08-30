@@ -190,8 +190,8 @@ const ErrorCode = enum(u8) {
     MissingField = 8,
     TraitMetaDataHasIncorrectType = 9,
     TraitIllegalUseOfTraitorInternalDecl = 10,
-    TraitMissingGenericTypeDeclaration = 11,
-    TraitGenericTypeNotAType = 12,
+    TraitMissingAssociatedTypeDeclaration = 11,
+    TraitAssociatedTypeNotAType = 12,
     TraitGenericTypeLayoutNotAuto = 13,
 
     // https://github.com/ziglang/zig/issues/6709
@@ -540,14 +540,14 @@ fn SubstitutedType(comptime ctx: Context, comptime pattern: type, comptime Trait
                 // Check that
                 // 1. This declaration is part of the trait specification
                 if (!@hasDecl(Trait, associated_type_decl_name)) {
-                    printError("Expected declaration of generic type '{s}' in trait.", ctx.writer, .TraitMissingGenericTypeDeclaration, .{associated_type_decl_name});
+                    printError("Expected declaration of associated type '{s}' in trait.", ctx.writer, .TraitMissingAssociatedTypeDeclaration, .{associated_type_decl_name});
 
                     return pattern;
                 }
 
                 // 2. The declaration is of type type
                 if (@TypeOf(@field(Trait, associated_type_decl_name)) != type) {
-                    printError("Expected declaration of generic type '{s}' to be of type 'type', got '{s}' instead.", ctx.writer, .TraitGenericTypeNotAType, .{
+                    printError("Expected declaration of associated type '{s}' to be of type 'type', got '{s}' instead.", ctx.writer, .TraitAssociatedTypeNotAType, .{
                         associated_type_decl_name,
                         @typeName(@TypeOf(@field(Trait, associated_type_decl_name))),
                     });
@@ -607,7 +607,7 @@ fn SubstitutedType(comptime ctx: Context, comptime pattern: type, comptime Trait
 
             // https://github.com/ziglang/zig/issues/6709
             if (is_generic and strct.decls.len != 0) {
-                printError("Structs making use of GATs must not have declarations. Found issue in '{s}'.", ctx.writer, .TraitGenericTypeHasDecls, .{
+                printError("Structs making use of associated types must not have declarations. Found issue in '{s}'.", ctx.writer, .TraitGenericTypeHasDecls, .{
                     @typeName(original_pattern),
                 });
 
