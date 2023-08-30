@@ -54,6 +54,102 @@ const GraphTrait2 = struct {
 **Warning: the prefix `__traitor_internal` is reserved for internal meta data. Using it yourself may
 result in unforseen errors.**
 
+## Associated Types
+One limitation that might become obvious pretty quickly is that defining methods is not possible
+with the tools laid out above. Specifically, if we had a trait
+```zig
+const GraphTrait = struct {
+    pub fn numEdges(self: GraphTrait) usize {
+        // code
+    }
+};
+```
+then any type implementing `GraphTrait` would have to add a function `numEdges` that takes as input
+parameter an instance of `GraphTrait` -- not of the type that implements it.
+```zig
+const MyGraph = struct {
+    num_edges: usize,
+
+    pub fn numEdges(self: GraphTrait) usize {
+        // no access to the field `num_edges` :(
+    }
+};
+```
+To allow for this, traitor can handle 'associated types' that get substituted at comptime to the
+relevant actual types.
+
+### `GenericSelf`
+The type `traitor.GenericSelf` will be substituted to whatever type that is being checked against trait
+bounds. So in the above example, we could actually implement methods using `traitor.GenericSelf`:
+```zig
+const GraphTrait = struct {
+    pub fn numEdges(self: traitor.GenericSelf) usize {
+        return 0;
+    }
+};
+
+const MyGraph = struct {
+    num_edges: usize,
+
+    pub fn numEdges(self: MyGraph) usize {
+        return self.num_edges; // :)
+    }
+};
+```
+Since type substitution works recursively, this also works with compound types and we can thus even take pointers
+to `self` and modify the struct.
+```zig
+const GraphTrait = struct {
+    pub fn addEdge(self: *traitor.GenericSelf, i: usize, j: usize) void {
+        // ...
+    }
+};
+
+const MyGraph = struct {
+    pub fn addEdge(self: *MyGraph, i: usize, j: usize) void {
+        // code
+    }
+};
+```
+
+### `AssociatedType("AssociatedTypeName")`
+We can use the same type substitution as in `traitor.GenericSelf` with arbitrary other associated types.
+To add an associated type, first the trait needs to have a declaration of type `type` and whose name is
+the name of the associated type.
+```zig
+const GraphTrait = struct {
+    pub const Payload = usize;
+};
+```
+Note that the types implementing your trait will be able to override the value
+of the declaration (i.e. what type the payload will be in this example), but they will still need to supply
+a `type` (e.g. they might use `Payload = []const u8` to store strings instead of integers).
+After that, you can reference this associated type throughout your trait using `traitor.AssociatedType("<name of AT>")`.
+```zig
+const GraphTrait = struct {
+    pub const Payload = usize;
+    pub const DefaultPayload: traitor.AssociatedType("Payload") = undefined;
+
+    some_node_payload: traitor.AssociatedType("Payload"),
+
+    pub fn getPayload(self: traitor.GenericSelf, i: usize) traitor.AssociatedType("Payload") {
+        // ...
+    }
+};
+
+const MyGraph = struct {
+    pub const Payload = []const u8;
+    pub const DefaultPayload: []const u8 = "foobar";
+
+    some_node_payload: []const u8,
+
+    pub fn getPayload(self: MyGraph, i: usize) []const u8 {
+        return self.some_node_payload;
+    }
+};
+```
+
+
 ## Error Codes
 Traitor prints a two digit error code (e.g. `[E01]`) at the start of each error message. These can be
 cross referenced here for a more detailed explanation of the kind of error traitor encountered.
