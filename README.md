@@ -52,7 +52,7 @@ const GraphTrait2 = struct {
 };
 ```
 **Warning: the prefix `__traitor_internal` is reserved for internal meta data. Using it yourself may
-result unforseen errors.**
+result in unforseen errors.**
 
 ## Error Codes
 Traitor prints a two digit error code (e.g. `[E01]`) at the start of each error message. These can be
