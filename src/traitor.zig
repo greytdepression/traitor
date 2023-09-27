@@ -1,4 +1,4 @@
-//! traitor v0.1
+//! traitor v0.2
 //!
 //! A small public-domain trait framework for zig
 //!
@@ -79,7 +79,7 @@
 // For an explanation of error codes, see below.
 
 const major_version = 0;
-const minor_version = 1;
+const minor_version = 2;
 
 const meta_declaration_modifier = "__traitor";
 const meta_trait_name = meta_declaration_modifier ++ "_trait_name";
