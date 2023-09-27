@@ -817,3 +817,22 @@ fn SubstitutedType(comptime ctx: Context, comptime pattern: type, comptime Trait
 
     return pattern;
 }
+
+const MaybeOpt = struct {
+    t: type,
+    is_optional: bool,
+};
+
+fn unwrapOptional(comptime T: type) MaybeOpt {
+    if (@hasDecl(T, optional_type_decl_identifier)) {
+        return MaybeOpt{
+            .t = @field(T, optional_type_decl_identifier),
+            .is_optional = true,
+        };
+    }
+
+    return MaybeOpt{
+        .t = T,
+        .is_optional = false,
+    };
+}
