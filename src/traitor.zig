@@ -297,6 +297,14 @@ pub fn AssociatedType(comptime decl_name: []const u8) type {
     };
 }
 
+// Optional Type Helper
+const optional_type_decl_identifier = "__traitor_internal_optional_type_decl";
+pub fn Optional(comptime T: type) type {
+    return struct {
+        const __traitor_internal_optional_type_decl = T;
+    };
+}
+
 pub fn checkTrait(comptime Trait: type, comptime T: type) void {
     @setEvalBranchQuota(eval_branch_quota);
 
