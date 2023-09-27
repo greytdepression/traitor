@@ -423,8 +423,16 @@ pub fn checkTrait(comptime Trait: type, comptime T: type) void {
             continue;
         }
 
+        // The raw zig type of the declaration
         const trait_decl_type_raw = @TypeOf(@field(Trait, trait_decl_name));
-        const trait_decl_type = SubstitutedType(ctx, trait_decl_type_raw, Trait, T, trait_decl_type_raw);
+
+        // Resolve optional types
+        const opt_unwrapped_tuple = unwrapOptional(trait_decl_type_raw);
+        const opt_unwrapped_trait_decl_type_raw = opt_unwrapped_tuple.t;
+        const is_opt = opt_unwrapped_tuple.is_opt;
+
+        // Resolve associated types -- see SubstitutedType()
+        const trait_decl_type = SubstitutedType(ctx, opt_unwrapped_trait_decl_type_raw, Trait, T, opt_unwrapped_trait_decl_type_raw);
 
         if (@hasDecl(T, trait_decl_name)) {
             const t_decl_type = @TypeOf(@field(T, trait_decl_name));
@@ -434,7 +442,7 @@ pub fn checkTrait(comptime Trait: type, comptime T: type) void {
 
                 declTypeErrorMessage(&error_writer, trait_decl_name, trait_decl_type, t_decl_type);
             }
-        } else {
+        } else if (!is_opt) {
             success = false;
 
             declMissingErrorMessage(&error_writer, trait_decl_name, trait_decl_type);
@@ -444,8 +452,17 @@ pub fn checkTrait(comptime Trait: type, comptime T: type) void {
     // Fields
     inline for (trait_struct_info.fields) |trait_field| {
         const trait_field_name = trait_field.name;
+
+        // The raw zig type of the declaration
         const trait_field_type_raw = trait_field.type;
-        const trait_field_type = SubstitutedType(ctx, trait_field_type_raw, Trait, T, trait_field_type_raw);
+
+        // Resolve optional types
+        const opt_unwrapped_tuple = unwrapOptional(trait_field_type_raw);
+        const opt_unwrapped_trait_field_type_raw = opt_unwrapped_tuple.t;
+        const is_opt = opt_unwrapped_tuple.is_opt;
+
+        // Resolve associated types -- see SubstitutedType()
+        const trait_field_type = SubstitutedType(ctx, opt_unwrapped_trait_field_type_raw, Trait, T, opt_unwrapped_trait_field_type_raw);
 
         if (@hasField(T, trait_field_name)) {
             const dummy: T = undefined;
@@ -460,7 +477,7 @@ pub fn checkTrait(comptime Trait: type, comptime T: type) void {
                     @typeName(t_field_type),
                 });
             }
-        } else {
+        } else if (!is_opt) {
             success = false;
 
             printError("Missing field '{s}: {s}'.", &error_writer, .MissingField, .{
