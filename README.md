@@ -54,6 +54,35 @@ const GraphTrait2 = struct {
 **Warning: the prefix `__traitor_internal` is reserved for internal meta data. Using it yourself may
 result in unforseen errors.**
 
+## Optional Fields and Declarations
+Sometimes you might want to allow an implementation of a trait to choose to not implement a certain
+field or declaration. For this case traitor allows you to hint to it that a certain field/declaration
+is optional. It will not throw a compile error if the type implementing your trait does not have said
+field/declaration, however, if a field/declaration of said name exists it will be type checked.
+
+To mark a field/declaration as optional you simply wrap its type in `traitor.Optional`.
+```zig
+const Trait = struct {
+    foo: traitor.Optional(usize),
+
+    pub const Bar: traitor.Optional(type) = .{};
+
+    pub const foobar: traitor.Optional(fn (usize, usize) bool) = .{};
+};
+```
+This trait above is then e.g. implemented by the empty struct `struct {}` or by
+```zig
+const Type = struct {
+    foo: usize,
+
+    pub const Bar: type = void;
+
+    pub fn foobar(i: usize, j: usize) bool {
+        // code
+    }
+};
+```
+
 ## Associated Types
 One limitation that might become obvious pretty quickly is that defining methods is not possible
 with the tools laid out above. Specifically, if we had a trait
