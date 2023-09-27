@@ -76,6 +76,129 @@
 // **Warning: the prefix `__traitor_internal` is reserved for internal meta data. Using it yourself may
 // result unforseen errors.**
 //
+// ## Optional Fields and Declarations
+// Sometimes you might want to allow an implementation of a trait to choose to not implement a certain
+// field or declaration. For this case traitor allows you to hint to it that a certain field/declaration
+// is optional. It will not throw a compile error if the type implementing your trait does not have said
+// field/declaration, however, if a field/declaration of said name exists it will be type checked.
+//
+// To mark a field/declaration as optional you simply wrap its type in `traitor.Optional`.
+// ```zig
+// const Trait = struct {
+//     foo: traitor.Optional(usize),
+//
+//     pub const Bar: traitor.Optional(type) = .{};
+//
+//     pub const foobar: traitor.Optional(fn (usize, usize) bool) = .{};
+// };
+// ```
+// This trait above is then e.g. implemented by the empty struct `struct {}` or by
+// ```zig
+// const Type = struct {
+//     foo: usize,
+//
+//     pub const Bar: type = void;
+//
+//     pub fn foobar(i: usize, j: usize) bool {
+//         // code
+//     }
+// };
+// ```
+//
+// ## Associated Types
+// One limitation that might become obvious pretty quickly is that defining methods is not possible
+// with the tools laid out above. Specifically, if we had a trait
+// ```zig
+// const GraphTrait = struct {
+//     pub fn numEdges(self: GraphTrait) usize {
+//         // code
+//     }
+// };
+// ```
+// then any type implementing `GraphTrait` would have to add a function `numEdges` that takes as input
+// parameter an instance of `GraphTrait` -- not of the type that implements it.
+// ```zig
+// const MyGraph = struct {
+//     num_edges: usize,
+//
+//     pub fn numEdges(self: GraphTrait) usize {
+//         // no access to the field `num_edges` :(
+//     }
+// };
+// ```
+// To allow for this, traitor can handle 'associated types' that get substituted at comptime to the
+// relevant actual types.
+//
+// ### `GenericSelf`
+// The type `traitor.GenericSelf` will be substituted to whatever type that is being checked against trait
+// bounds. So in the above example, we could actually implement methods using `traitor.GenericSelf`:
+// ```zig
+// const GraphTrait = struct {
+//     pub fn numEdges(self: traitor.GenericSelf) usize {
+//         return 0;
+//     }
+// };
+//
+// const MyGraph = struct {
+//     num_edges: usize,
+//
+//     pub fn numEdges(self: MyGraph) usize {
+//         return self.num_edges; // :)
+//     }
+// };
+// ```
+// Since type substitution works recursively, this also works with compound types and we can thus even take pointers
+// to `self` and modify the struct.
+// ```zig
+// const GraphTrait = struct {
+//     pub fn addEdge(self: *traitor.GenericSelf, i: usize, j: usize) void {
+//         // ...
+//     }
+// };
+//
+// const MyGraph = struct {
+//     pub fn addEdge(self: *MyGraph, i: usize, j: usize) void {
+//         // code
+//     }
+// };
+// ```
+//
+// ### `AssociatedType("AssociatedTypeName")`
+// We can use the same type substitution as in `traitor.GenericSelf` with arbitrary other associated types.
+// To add an associated type, first the trait needs to have a declaration of type `type` and whose name is
+// the name of the associated type.
+// ```zig
+// const GraphTrait = struct {
+//     pub const Payload = usize;
+// };
+// ```
+// Note that the types implementing your trait will be able to override the value
+// of the declaration (i.e. what type the payload will be in this example), but they will still need to supply
+// a `type` (e.g. they might use `Payload = []const u8` to store strings instead of integers).
+// After that, you can reference this associated type throughout your trait using `traitor.AssociatedType("<name of AT>")`.
+// ```zig
+// const GraphTrait = struct {
+//     pub const Payload = usize;
+//     pub const DefaultPayload: traitor.AssociatedType("Payload") = undefined;
+//
+//     some_node_payload: traitor.AssociatedType("Payload"),
+//
+//     pub fn getPayload(self: traitor.GenericSelf, i: usize) traitor.AssociatedType("Payload") {
+//         // ...
+//     }
+// };
+//
+// const MyGraph = struct {
+//     pub const Payload = []const u8;
+//     pub const DefaultPayload: []const u8 = "foobar";
+//
+//     some_node_payload: []const u8,
+//
+//     pub fn getPayload(self: MyGraph, i: usize) []const u8 {
+//         return self.some_node_payload;
+//     }
+// };
+// ```
 // For an explanation of error codes, see below.
 
 const major_version = 0;
