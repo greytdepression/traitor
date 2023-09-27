@@ -8,7 +8,7 @@ license.
 
 ## Quick Start
 Zig's standard library already has trait helpers in the form of std.meta.trait that
-lets you query a type for declarations and fields by name.
+let you query a type for declarations and fields by name.
 Traitor works in a more Rust inspired way. You define a trait by building a struct
 that contains all the desired fields, declarations, and functions.
 ```zig
